@@ -1,0 +1,9 @@
+[package]
+name = "actor"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+the-fourth-server = { path = "the-fourth-server"}
+serde = { version = "1.0.219", features = ["derive"] }
+num_enum = "0.7"
