@@ -1,11 +1,11 @@
 use std::mem;
 use std::sync::atomic::{AtomicBool, Ordering};
-use crate::operational::data_cipher::DataCipher;
 use crate::operational::data_pack::{DataPack, DataPacket};
 use crate::operational::tun_interface::{IpPacket, TunInterface, TunInterfaceCreateInfo};
 use crate::vpn_config::VpnConfig;
 use std::thread::sleep;
 use std::time::Duration;
+use tfserver::util::data_cipher::DataCipher;
 use crate::util::semaphore::Semaphore;
 
 pub struct DirectTun {
@@ -24,7 +24,7 @@ pub struct DirectTun {
 impl DirectTun {
     pub fn new(vpn_config: VpnConfig, iv: String, ip_assigned: String, iff_name: Option<String>) -> DirectTun {
         let data_pack = DataPack::new(vpn_config.clone());
-        let data_cipher = DataCipher::new(vpn_config.clone());
+        let data_cipher = DataCipher::new_init(vpn_config.encryption_type, vpn_config.key.clone());
         let mut tun_info = TunInterfaceCreateInfo::default();
         let netmask = "255.255.255.0".to_string();
         tun_info.set_iff_ip(&ip_assigned);
@@ -79,7 +79,7 @@ impl DirectTun {
         res_buffer.truncate(size);
         let mut data = self.data_pack.pre_process_data(res_buffer.as_slice());
         data.iter().for_each(|x|{
-            self.tun_interface.write(x.data.as_slice());
+            self.tun_interface.write(x.data.data.as_slice());
         })
     }
     

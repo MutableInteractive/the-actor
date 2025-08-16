@@ -100,7 +100,6 @@ pub struct RegisterHandlerAnswer{
     pub(crate) s_type: ActorStructureType,
     pub(crate) ipv4: String,
     pub(crate) ipv6: String,
-    mtu: u32
 }
 
 impl StrongType for RegisterHandlerRequest {
@@ -110,7 +109,7 @@ impl StrongType for RegisterHandlerRequest {
 }
 
 impl StrongType for RegisterHandlerAnswer {
-    fn get_s_type(&self) -> &dyn StrongType {
+    fn get_s_type(&self) -> &dyn StructureType {
         &self.s_type
     }
 }

@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 use tfserver::server::handler::Handler;
 use tfserver::structures::s_type::{StrongType, StructureType};
 use tfserver::structures::s_type;
+use tungstenite::WebSocket;
 use crate::handlers::actor_structure_type::{ActorStructureType, ClientAnswerChallenge, ServerAuthoriChallenge};
 
 pub struct AuthHandler{
@@ -15,8 +16,8 @@ pub struct AuthHandler{
 
 
 impl Handler for AuthHandler {
-    fn serve_route(&mut self, client_meta: SocketAddr, s_type: StructureType, data: Vec<u8>) -> Result<Vec<u8>, Vec<u8>> {
-        match s_type {
+    fn serve_route(&mut self, client_meta: SocketAddr, s_type: Box<dyn StructureType>, data: Vec<u8>) -> Result<Vec<u8>, Vec<u8>> {
+        match s_type.as_any().downcast_ref::<ActorStructureType>().unwrap() {
             ActorStructureType::ClientChallengeReq => {
                 let challenge = generate_challenge_and_encrypt(self.config.key.as_str()).unwrap();
                 self.pending_challenges.insert(client_meta, challenge.0);
@@ -51,7 +52,7 @@ impl Handler for AuthHandler {
         None
     }
 
-    fn accept_stream(&mut self, stream: Vec<Arc<Mutex<TcpStream>>>) {
+    fn accept_stream(&mut self, stream: Vec<Arc<Mutex<WebSocket<TcpStream>>>>) {
         todo!()
     }
 }

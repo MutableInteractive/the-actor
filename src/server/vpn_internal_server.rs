@@ -1,13 +1,13 @@
 use crate::operational::packet_router::{AddressTuple, PacketRouter};
 use crate::vpn_config::VpnConfig;
 use std::collections::HashMap;
-use std::io::Write;
 use std::net::TcpStream;
 use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
 use tfserver::util::thread_pool::ThreadPool;
+use tungstenite::{Bytes, Message, WebSocket};
 use crate::front_interface::jni_receiver::JniReceiver;
 use crate::server::receiver_info::ReceiverInfo;
 
@@ -16,7 +16,7 @@ pub struct VpnServerInternal {
     workgroup: Arc<Mutex<ThreadPool>>,
     router: Arc<Mutex<PacketRouter>>,
     streams_in_handle:
-        Arc<Mutex<HashMap<AddressTuple, ((Arc<Mutex<TcpStream>>, Arc<Mutex<ReceiverInfo>>), Arc<Mutex<AtomicBool>>)>>>,
+        Arc<Mutex<HashMap<AddressTuple, ((Arc<Mutex<WebSocket<TcpStream>>>, Arc<Mutex<ReceiverInfo>>), Arc<Mutex<AtomicBool>>)>>>,
     config: Arc<VpnConfig>,
 }
 
@@ -32,6 +32,13 @@ impl VpnServerInternal {
             router: packet_router,
             workgroup: thread_pool,
             config,
+        }
+    }
+
+    fn bytes_into_vec(b: tungstenite::Bytes) -> Vec<u8> {
+        match b.try_into() {
+            Ok(vec) => vec, // zero-copy if unique
+            _ => Vec::new(),
         }
     }
 
@@ -52,28 +59,27 @@ impl VpnServerInternal {
                     let stream_ref = element.1 .0.0.clone();
                     let info_ref = element.1 .0.1.clone();
                     in_handle_ref.lock().unwrap().store(true, Relaxed);
+                    let value = config_ref.clone();
                     workgroup2.lock().unwrap().execute(move || {
                         let mut receiver_info_lock = info_ref.lock().unwrap();
-                        let mut data = receiver_info_lock
-                            .mtu_splitter
-                            .receive_data(stream_ref.lock().unwrap().by_ref());
+                        let mut data = stream_ref.lock().unwrap().read();
                         let mut receiver_ref =
                             receiver_info_lock.receiver_handle.lock().unwrap();
                         let receiver = receiver_ref
                             .as_any_mut()
                             .downcast_mut::<JniReceiver>()
                             .unwrap();
-                        if data.is_some() {
-                            let data = data.unwrap();
-                            if data.len() > 0{
-                                receiver.write_data(data);
+                        if data.is_ok() {
+                            let mut data = Self::bytes_into_vec(data.unwrap().into_data());
+                            if !data.is_empty(){
+                                receiver.write_data(data.as_mut_slice());
                             }
-                        } else {
-
                         }
-                        sleep(Duration::from_millis(config_ref.resyncer_timeout_ms as u64));
+                        sleep(Duration::from_millis(value.resyncer_timeout_ms as u64));
                         let packets = receiver.get_data();
-                        if packets.
+                        if !packets.is_empty(){
+                            stream_ref.lock().unwrap().send(Message::Binary(Bytes::from(packets))).unwrap();
+                        }
                         in_handle_ref.lock().unwrap().store(false, Relaxed);
                     });
                 }

@@ -1,5 +1,4 @@
 use std::any::Any;
-use crate::operational::data_cipher::DataCipher;
 use crate::operational::data_pack::{DATA_PACKET, DataPack};
 use crate::operational::packet_router::PacketReceiver;
 use crate::util::semaphore::Semaphore;
@@ -23,7 +22,7 @@ pub struct JniReceiver {
 impl JniReceiver {
     pub fn new(vpn_config: &VpnConfig, iv: String) -> JniReceiver {
         let data_pack = DataPack::new(vpn_config.clone());
-        let data_cipher = DataCipher::new_init(vpn_config.encryption_type, vpn_config.key);
+        let data_cipher = DataCipher::new_init(vpn_config.encryption_type, vpn_config.key.clone());
         Self {
             data_pack,
             data_cipher,
@@ -71,8 +70,8 @@ impl JniReceiver {
             let packet = packets.pop().unwrap();
             if packet.packet_type == DATA_PACKET {
                 ip_packets.push(IpPacket {
-                    meta: TunInterface::extract_general_ip_header(packet.data.as_slice()),
-                    data: packet.data,
+                    meta: TunInterface::extract_general_ip_header(packet.data.data.as_slice()),
+                    data: packet.data.data,
                 });
             }
         }

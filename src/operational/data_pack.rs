@@ -12,7 +12,7 @@ pub const GARBAGE_PACKET: u8 = 1;
 pub const SYSTEM_PACKET: u8 = 2;
 
 #[derive(Clone, Debug, PartialEq)]
-struct BytesBuff{
+pub struct BytesBuff{
     pub data: Vec<u8>,
 }
 
@@ -37,20 +37,20 @@ impl Serialize for BytesBuff {
 
 
 
-impl Deserialize for BytesBuff {
-    fn deserialize<'de, D>(deserializer: D) -> Result<Self, D::Error>
+impl<'de> Deserialize<'de> for BytesBuff {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>
+        D: Deserializer<'de>,
     {
         let v: Vec<u8> = Vec::deserialize(deserializer)?;
-        Ok(Self{data: v})
+        Ok(Self { data: v })
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct DataPacket {
     pub packet_type: u8,
-    data: BytesBuff
+    pub(crate) data: BytesBuff
 }
 
 
@@ -114,13 +114,13 @@ impl DataPack {
         let mut res_packets: Vec<DataPacket> = Vec::new();
         let mut i: u64 = 0;
         while i < data.len() as u64 {
-            let length_bytes: [u8;4] = data[i..i+4].try_into().unwrap();
+            let length_bytes: [u8;4] = data[i as usize..i as usize+4].try_into().unwrap();
             let length = u32::from_be_bytes(length_bytes);
-            let data_packet: DataPacket = bincode::serde::decode_from_slice(data[i+4..i+4+length], BINCODE_CFG.clone()).unwrap().0;
+            let data_packet: DataPacket = bincode::serde::decode_from_slice(&data[i as usize+4..i as usize+4+length as usize], BINCODE_CFG.clone()).unwrap().0;
             if data_packet.packet_type != GARBAGE_PACKET{
                 res_packets.push(data_packet);
             }
-            i = i+4+length;
+            i = i+4+(length as u64);
         }
         res_packets
     }
