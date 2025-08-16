@@ -1,26 +1,15 @@
 use std::collections::HashMap;
-use std::intrinsics::mir::Drop;
 use crate::front_interface::jni_receiver::JniReceiver;
-use crate::operational::data_cipher::DataCipher;
 use crate::operational::packet_router::PacketRouter;
 use crate::server::receiver_info::ReceiverInfo;
-use crate::streams::mtu_splitter::MtuSplitter;
-use crate::util::challenge_util::generate_challenge_and_encrypt;
 use crate::vpn_config::VpnConfig;
-use rand::random_range;
-use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::ops::Deref;
 use std::sync::{Arc, Mutex};
-use serde::{Deserialize, Serialize};
 use tfserver::server::handler::Handler;
 use tfserver::structures::s_type;
 use crate::handlers::actor_structure_type::{ActorStructureType, RegisterHandlerAnswer};
-use crate::server::handler::Handler;
-use crate::streams::s_type;
-use crate::streams::s_type::{StrongType, StructureType};
-use crate::util::rand_utils;
-use crate::verbose::logger::Logger;
+
 
 
 pub struct RegisterHandler {
@@ -39,9 +28,8 @@ impl Handler for RegisterHandler {
         }
         let iv = iv.unwrap();
         let receiver = JniReceiver::new(self.config.clone().deref(), iv.0.clone());
-        let mtu = random_range(self.config.mtu_min..self.config.mtu_max);
         let reg_data1 = self.router.lock().unwrap().register(Arc::new(Mutex::new(receiver)));
-        let reg_data = RegisterHandlerAnswer{s_type: StructureType::RegisterHandlerAnswer, ipv4: reg_data1.0.to_string(), ipv6: reg_data1.1.to_string(), mtu};
+        let reg_data = RegisterHandlerAnswer{s_type: ActorStructureType::RegisterHandlerAnswer, ipv4: reg_data1.0.to_string(), ipv6: reg_data1.1.to_string(), mtu};
         let data = s_type::to_vec_encrypted(&reg_data, self.config.encryption_type, self.config.key.clone(), iv.0.clone().as_bytes()).unwrap();
         let receiver_info = ReceiverInfo {
             cipher,

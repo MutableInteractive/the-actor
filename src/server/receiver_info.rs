@@ -1,9 +1,7 @@
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::sync::{Arc, Mutex};
-use crate::front_interface::jni_receiver::JniReceiver;
-use crate::operational::data_cipher::DataCipher;
+use tfserver::util::data_cipher::DataCipher;
 use crate::operational::packet_router::PacketReceiver;
-use crate::streams::mtu_splitter::MtuSplitter;
 
 pub struct ReceiverInfo{
     pub cipher: DataCipher,

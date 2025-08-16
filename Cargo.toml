@@ -7,3 +7,14 @@ edition = "2024"
 the-fourth-server = { path = "the-fourth-server"}
 serde = { version = "1.0.219", features = ["derive"] }
 num_enum = "0.7"
+rand = "0.9"
+bincode = { version = "2", features = ["serde"] }
+tun = {version = "0.8.0" ,features = ["tokio", "async"]}
+etherparse = "0.18.0"
+nix = { version = "0.28", optional = true, features = ["fs"] }
+cfg-if = "1.0.1"
+sha2 = "0.10" # to derive key from password
+base64 = "0.21.7"
+openssl = "0.10"
+chrono = "0.4.41"
+byteorder = "1.5"

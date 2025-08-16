@@ -4,8 +4,6 @@ pub struct Logger{
 
 }
 
-
-
 impl Logger {
     pub fn log_message(message: &str, m_type: &str, source: &str){
         let date = Local::now();

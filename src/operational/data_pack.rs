@@ -1,23 +1,58 @@
+use rand::random_range;
 use crate::util::rand_utils::generate_random_u8_vec;
 use crate::operational::tun_interface::IpPacket;
 use crate::vpn_config::VpnConfig;
-use rand::random_range;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::ser::SerializeTuple;
+use tfserver::structures::s_type;
+use tfserver::structures::s_type::BINCODE_CFG;
 
 pub const DATA_PACKET: u8 = 0;
 pub const GARBAGE_PACKET: u8 = 1;
 pub const SYSTEM_PACKET: u8 = 2;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub struct DataPacket {
-    pub packet_type: u8,
+#[derive(Clone, Debug, PartialEq)]
+struct BytesBuff{
     pub data: Vec<u8>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct DataPackData {
-    pub packets: Vec<DataPacket>,
+impl BytesBuff {
+    pub fn new(data: Vec<u8>) -> Self {
+        Self { data }
+    }
 }
+
+impl Serialize for BytesBuff {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer
+    {
+        let mut tup = serializer.serialize_tuple(self.data.len())?;
+        for b in self.data.iter() {
+            tup.serialize_element(b)?;
+        }
+        tup.end()
+    }
+}
+
+
+
+impl Deserialize for BytesBuff {
+    fn deserialize<'de, D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>
+    {
+        let v: Vec<u8> = Vec::deserialize(deserializer)?;
+        Ok(Self{data: v})
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+pub struct DataPacket {
+    pub packet_type: u8,
+    data: BytesBuff
+}
+
 
 pub struct DataPack {
     vpn_config: VpnConfig,
@@ -29,44 +64,63 @@ impl DataPack {
     }
 
     pub fn post_process_data(&self, mut packets: Vec<IpPacket>) -> Vec<u8> {
-        let mut res_packets = Vec::new();
+        let mut data = Vec::new();
         let mut garbage_packet_counter = 0;
         let garbage_amount = random_range(
             self.vpn_config.min_garbage_packets_amount..self.vpn_config.max_garbage_packets_amount,
         );
         while packets.len() > 0 {
-            let packet: IpPacket = packets.pop().unwrap();
-            let packed_data = DataPacket {
-                packet_type: DATA_PACKET,
-                data: packet.data,
-            };
-            res_packets.push(packed_data);
+            let current_roll = rand::random_range(0..2);
+            if current_roll == 0 &&  garbage_packet_counter < garbage_amount {
+                let packet = Self::generate_garbage_packet(random_range(
+                    self.vpn_config.garbage_packet_min_size..self.vpn_config.garbage_packet_max_size,
+                ));
 
-            if garbage_packet_counter < garbage_amount {
-                res_packets.push(Self::generate_garbage_packet(random_range(
-                    self.vpn_config.garbage_packet_min_size
-                        ..self.vpn_config.garbage_packet_max_size,
-                )));
+                let mut temp_data = bincode::serde::encode_to_vec(&packet, BINCODE_CFG.clone()).expect("Failed to serialize packet data");
+                let length_bytes: u32 = temp_data.len() as u32;
+                let length_bytes: [u8; 4] = length_bytes.to_be_bytes();
+                length_bytes.iter().for_each(|&x| data.push(x));
+                data.append(&mut temp_data);
                 garbage_packet_counter += 1;
+            } else {
+                let packet: IpPacket = packets.pop().unwrap();
+                let packed_data = DataPacket {
+                    packet_type: DATA_PACKET,
+                    data: BytesBuff::new(packet.data),
+                };
+                let mut temp_data = bincode::serde::encode_to_vec(&packed_data, BINCODE_CFG.clone()).expect("Failed to serialize packet data");
+                let length_bytes: u32 = temp_data.len() as u32;
+                let length_bytes: [u8; 4] = length_bytes.to_be_bytes();
+                length_bytes.iter().for_each(|&x| data.push(x));
+                data.append(&mut temp_data);
             }
         }
         while garbage_packet_counter < garbage_amount {
-            res_packets.push(Self::generate_garbage_packet(random_range(
+            let packet = Self::generate_garbage_packet(random_range(
                 self.vpn_config.garbage_packet_min_size..self.vpn_config.garbage_packet_max_size,
-            )));
+            ));
+            let mut temp_data = bincode::serde::encode_to_vec(&packet, BINCODE_CFG.clone()).expect("Failed to serialize packet data");
+            let length_bytes: u32 = temp_data.len() as u32;
+            let length_bytes: [u8; 4] = length_bytes.to_be_bytes();
+            length_bytes.iter().for_each(|&x| data.push(x));
+            data.append(&mut temp_data);
             garbage_packet_counter += 1;
         }
-        let data_pack = DataPackData { packets: res_packets };
-        rmp_serde::to_vec(&data_pack).expect("Serialization failed")
+
+        data
     }
 
     pub fn pre_process_data(&self, data: &[u8]) -> Vec<DataPacket> {
-        let mut data: DataPackData = rmp_serde::from_slice(data).expect("Deserialization failed");
-        let mut res_packets = Vec::new();
-        for i in 0..data.packets.len() {
-            if data.packets[i].packet_type != GARBAGE_PACKET {
-                res_packets.push(data.packets[i].clone());
+        let mut res_packets: Vec<DataPacket> = Vec::new();
+        let mut i: u64 = 0;
+        while i < data.len() as u64 {
+            let length_bytes: [u8;4] = data[i..i+4].try_into().unwrap();
+            let length = u32::from_be_bytes(length_bytes);
+            let data_packet: DataPacket = bincode::serde::decode_from_slice(data[i+4..i+4+length], BINCODE_CFG.clone()).unwrap().0;
+            if data_packet.packet_type != GARBAGE_PACKET{
+                res_packets.push(data_packet);
             }
+            i = i+4+length;
         }
         res_packets
     }
@@ -75,7 +129,7 @@ impl DataPack {
         let data = generate_random_u8_vec(packet_size as usize);
         DataPacket {
             packet_type: GARBAGE_PACKET,
-            data,
+            data: BytesBuff::new(data),
         }
     }
 }

@@ -1,18 +1,12 @@
 use std::collections::HashMap;
-use crate::util::challenge_util::{decrypt_aes_ecb_base64, generate_challenge_and_encrypt};
-use crate::verbose::logger::Logger;
+use crate::util::challenge_util::generate_challenge_and_encrypt;
 use crate::vpn_config::VpnConfig;
-use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::sync::{Arc, Mutex};
 use tfserver::server::handler::Handler;
 use tfserver::structures::s_type::{StrongType, StructureType};
-use serde::{Deserialize, Serialize};
 use tfserver::structures::s_type;
 use crate::handlers::actor_structure_type::{ActorStructureType, ClientAnswerChallenge, ServerAuthoriChallenge};
-use crate::server::handler::Handler;
-use crate::streams::s_type;
-use crate::streams::s_type::{StrongType, StructureType};
 
 pub struct AuthHandler{
     pending_challenges: HashMap<SocketAddr, String>,
