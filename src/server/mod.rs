@@ -1,2 +1,2 @@
 pub mod receiver_info;
-mod vpn_internal_server;
+pub mod proxy_internal_server;

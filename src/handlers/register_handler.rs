@@ -1,26 +1,26 @@
 use std::collections::HashMap;
 use crate::front_interface::jni_receiver::JniReceiver;
-use crate::operational::packet_router::PacketRouter;
+use crate::operational::packet_router::{AddressTuple, PacketRouter};
 use crate::server::receiver_info::ReceiverInfo;
 use crate::vpn_config::VpnConfig;
 use std::net::{SocketAddr, TcpStream};
 use std::ops::Deref;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::AtomicBool;
 use tfserver::server::handler::Handler;
 use tfserver::structures::s_type;
 use tfserver::structures::s_type::StructureType;
+use tfserver::tungstenite::WebSocket;
 use tfserver::util::data_cipher::DataCipher;
-use tungstenite::WebSocket;
 use crate::handlers::actor_structure_type::{ActorStructureType, RegisterHandlerAnswer};
-
-
+use crate::server::proxy_internal_server::ProxyServerInternal;
 
 pub struct RegisterHandler {
-    addresses_iv: Arc<Mutex<HashMap<SocketAddr, (String, String)>>>,
-    router: Arc<Mutex<PacketRouter>>,
-    config: Arc<VpnConfig>,
-    pending_receivers: Arc<Mutex<HashMap<SocketAddr, ReceiverInfo>>>,
-    owned_streams: Arc<Mutex<Vec<Arc<Mutex<WebSocket<TcpStream>>>>>>,
+    pub(crate) addresses_iv: Arc<Mutex<HashMap<SocketAddr, (String, String)>>>,
+    pub(crate) router: Arc<Mutex<PacketRouter>>,
+    pub(crate) config: Arc<VpnConfig>,
+    pub(crate) pending_receivers: Arc<Mutex<HashMap<SocketAddr, ReceiverInfo>>>,
+    pub(crate) proxy_server: Arc<Mutex<ProxyServerInternal>>,
 }
 
 impl Handler for RegisterHandler {
@@ -64,13 +64,13 @@ impl Handler for RegisterHandler {
 
     fn accept_stream(&mut self, mut stream: Vec<Arc<Mutex<WebSocket<TcpStream>>>>) {
         let mut receivers_lock = self.pending_receivers.lock().unwrap();
-        stream.iter().for_each(|stream| {
-            receivers_lock.remove(&stream.lock().unwrap().get_ref().peer_addr().unwrap());
-        });
-        drop(receivers_lock);
-        let mut lock = self.owned_streams.lock().unwrap();
+        let binding = self.proxy_server.lock().unwrap();
+        let mut streams_lock = binding.streams_in_handle.lock().unwrap();
         while !stream.is_empty(){
-            lock.push(stream.pop().unwrap());
+            let stream_c = stream.pop().unwrap();
+            let data = receivers_lock.remove(stream_c.lock().unwrap().get_ref().peer_addr().as_ref().unwrap()).unwrap();
+            streams_lock.insert(AddressTuple::new_full(data.ipv4addr.clone(), data.ipv6addr.clone()),
+                                ((stream_c, Arc::new(Mutex::new(data))), Arc::new(Mutex::new(AtomicBool::new(false)))));
         }
     }
 }

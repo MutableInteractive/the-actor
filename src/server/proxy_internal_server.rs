@@ -6,21 +6,22 @@ use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
+use tfserver::tungstenite;
+use tfserver::tungstenite::{Bytes, Message, WebSocket};
 use tfserver::util::thread_pool::ThreadPool;
-use tungstenite::{Bytes, Message, WebSocket};
 use crate::front_interface::jni_receiver::JniReceiver;
 use crate::server::receiver_info::ReceiverInfo;
 
-pub struct VpnServerInternal {
+pub struct ProxyServerInternal {
     running: Arc<Mutex<AtomicBool>>,
     workgroup: Arc<Mutex<ThreadPool>>,
     router: Arc<Mutex<PacketRouter>>,
-    streams_in_handle:
+    pub(crate) streams_in_handle:
         Arc<Mutex<HashMap<AddressTuple, ((Arc<Mutex<WebSocket<TcpStream>>>, Arc<Mutex<ReceiverInfo>>), Arc<Mutex<AtomicBool>>)>>>,
     config: Arc<VpnConfig>,
 }
 
-impl VpnServerInternal {
+impl ProxyServerInternal {
     pub fn new(
         config: Arc<VpnConfig>,
         packet_router: Arc<Mutex<PacketRouter>>,
@@ -84,6 +85,8 @@ impl VpnServerInternal {
                     });
                 }
             });
+            router_ref.lock().unwrap().write_packets();
+            router_ref.lock().unwrap().receive_packets();
         });
     }
 }

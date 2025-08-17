@@ -1,8 +1,8 @@
 use base64::{engine::general_purpose, Engine as _};
-use openssl::symm::{Cipher, Crypter, Mode};
 use rand::distr::Alphanumeric;
 use rand::Rng;
-use sha2::{Digest, Sha256};
+use tfserver::openssl::symm::{Cipher, Crypter, Mode};
+use tfserver::sha2::{Digest, Sha256};
 
 pub fn generate_challenge_and_encrypt(
     password: &str,

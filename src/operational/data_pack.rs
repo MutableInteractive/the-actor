@@ -1,9 +1,12 @@
 use rand::random_range;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::ser::SerializeTuple;
+use tfserver::bincode;
+
 use crate::util::rand_utils::generate_random_u8_vec;
 use crate::operational::tun_interface::IpPacket;
 use crate::vpn_config::VpnConfig;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use serde::ser::SerializeTuple;
+
 use tfserver::structures::s_type;
 use tfserver::structures::s_type::BINCODE_CFG;
 
