@@ -75,24 +75,23 @@ impl StructureType for ActorStructureType {
 
 #[derive(Serialize, Deserialize)]
 pub struct ChallengeAuthReq{
-    s_type: ActorStructureType,
-    payload: u32
+    pub s_type: ActorStructureType,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct ServerAuthoriChallenge{
-    pub(crate) s_type: ActorStructureType,
-    pub(crate) challenge: String,
+    pub s_type: ActorStructureType,
+    pub challenge: String,
 }
 #[derive(Serialize, Deserialize)]
 pub struct ClientAnswerChallenge{
-    s_type: ActorStructureType,
-    pub(crate) answer: String,
+    pub s_type: ActorStructureType,
+    pub answer: String,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct RegisterHandlerRequest{
-    s_type: ActorStructureType,
+    pub s_type: ActorStructureType,
 }
 
 #[derive(Serialize, Deserialize)]
