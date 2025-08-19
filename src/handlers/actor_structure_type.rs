@@ -96,9 +96,9 @@ pub struct RegisterHandlerRequest{
 
 #[derive(Serialize, Deserialize)]
 pub struct RegisterHandlerAnswer{
-    pub(crate) s_type: ActorStructureType,
-    pub(crate) ipv4: String,
-    pub(crate) ipv6: String,
+    pub s_type: ActorStructureType,
+    pub ipv4: String,
+    pub ipv6: String,
 }
 
 impl StrongType for RegisterHandlerRequest {

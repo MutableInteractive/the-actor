@@ -1,17 +1,19 @@
 use crate::handlers::actor_structure_type::{ActorStructureType, ChallengeAuthReq, ClientAnswerChallenge, ServerAuthoriChallenge};
 use crate::util::challenge_util::decrypt_aes_ecb_base64;
 use crate::vpn_config::VpnConfig;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::sync::atomic::AtomicBool;
 use tfserver::client::Receiver;
 use tfserver::structures::s_type;
 use tfserver::structures::s_type::StructureType;
+use crate::receivers::register_receiver::RegisterReceiver;
 
 pub struct AuthReceiver {
-    auth_passed: AtomicBool,
-    challenge_answer: Option<ClientAnswerChallenge>,
-    config: Arc<VpnConfig>,
-    iv_result: Option<String>
+    pub(crate) auth_passed: AtomicBool,
+    pub(crate) challenge_answer: Option<ClientAnswerChallenge>,
+    pub(crate) config: Arc<VpnConfig>,
+    pub(crate) iv_result: Option<String>,
+    pub(crate) register_receiver: Arc<Mutex<RegisterReceiver>>,
 }
 
 impl Receiver for AuthReceiver {
@@ -52,14 +54,20 @@ impl Receiver for AuthReceiver {
             let challenge_answer =
                 decrypt_aes_ecb_base64(self.config.key.as_str(), challenge.challenge.as_str())
                     .unwrap();
+            println!("{:?}", challenge_answer);
             self.challenge_answer = Some(ClientAnswerChallenge{s_type: ActorStructureType::ClientAuthAnswer, answer: challenge_answer});
         } else {
+            for x in response.iter() {
+                print!("{}", *x as char);
+            }
+            println!();
             let challenge =
                 s_type::from_slice::<ServerAuthoriChallenge>(response.as_slice()).unwrap();
             let challenge_answer =
                 decrypt_aes_ecb_base64(self.config.key.as_str(), challenge.challenge.as_str())
                     .unwrap();
             self.auth_passed.store(true, std::sync::atomic::Ordering::Relaxed);
+            self.register_receiver.lock().unwrap().iv_current = Some(challenge_answer.clone());
             self.iv_result = Some(challenge_answer);
         }
     }

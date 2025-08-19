@@ -1,2 +1,2 @@
 pub mod auth_receiver;
-mod register_receiver;
+pub mod register_receiver;

@@ -34,7 +34,7 @@ impl Handler for AuthHandler {
                 let challenge = generate_challenge_and_encrypt(self.config.key.as_str()).unwrap();
                 self.pending_challenges.insert(client_meta, challenge.0);
                 let challenge = ServerAuthoriChallenge {
-                    s_type: ActorStructureType::ClientChallengeReq,
+                    s_type: ActorStructureType::ServerAuthChallenge,
                     challenge: challenge.1,
                 };
                 return Ok(s_type::to_vec(&challenge).unwrap());
@@ -51,7 +51,7 @@ impl Handler for AuthHandler {
                     return Err(client_answer.err().unwrap().to_string().into_bytes());
                 }
                 let client_answer = client_answer.unwrap();
-                if !client_answer.answer.eq(answer_real) {
+                if client_answer.answer == answer_real.clone() {
                     let challenge =
                         generate_challenge_and_encrypt(self.config.key.as_str()).unwrap();
                     self.register_handler.lock().unwrap().addresses_iv.lock().unwrap().insert(client_meta, challenge.clone());
@@ -62,7 +62,7 @@ impl Handler for AuthHandler {
 
                     return Ok(s_type::to_vec(&challenge).unwrap());
                 }
-                return Err(String::from("unknown error!").into_bytes());
+                return Err(String::from("challenge failed!").into_bytes());
             }
             _ => {
                 return Err(String::from("no such structure type!").into_bytes());
