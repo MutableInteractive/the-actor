@@ -1,5 +1,8 @@
+use std::fmt;
+use std::fmt::Write;
 use rand::random_range;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::de::{SeqAccess, Visitor};
 use serde::ser::SerializeTuple;
 use tfserver::bincode;
 
@@ -14,39 +17,14 @@ pub const DATA_PACKET: u8 = 0;
 pub const GARBAGE_PACKET: u8 = 1;
 pub const SYSTEM_PACKET: u8 = 2;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize,)]
 pub struct BytesBuff{
     pub data: Vec<u8>,
 }
 
 impl BytesBuff {
     pub fn new(data: Vec<u8>) -> Self {
-        Self { data }
-    }
-}
-
-impl Serialize for BytesBuff {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer
-    {
-        let mut tup = serializer.serialize_tuple(self.data.len())?;
-        for b in self.data.iter() {
-            tup.serialize_element(b)?;
-        }
-        tup.end()
-    }
-}
-
-
-
-impl<'de> Deserialize<'de> for BytesBuff {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let v: Vec<u8> = Vec::deserialize(deserializer)?;
-        Ok(Self { data: v })
+        Self{data}
     }
 }
 
@@ -109,7 +87,6 @@ impl DataPack {
             data.append(&mut temp_data);
             garbage_packet_counter += 1;
         }
-
         data
     }
 
@@ -119,7 +96,14 @@ impl DataPack {
         while i < data.len() as u64 {
             let length_bytes: [u8;4] = data[i as usize..i as usize+4].try_into().unwrap();
             let length = u32::from_be_bytes(length_bytes);
-            let data_packet: DataPacket = bincode::serde::decode_from_slice(&data[i as usize+4..i as usize+4+length as usize], BINCODE_CFG.clone()).unwrap().0;
+            if length > data.len() as u32 {
+                return res_packets;
+            }
+
+            let start = i as usize+4;
+            let end = start + length as usize;
+
+            let data_packet: DataPacket = bincode::serde::decode_from_slice(&data[start..end], BINCODE_CFG.clone()).unwrap().0;
             if data_packet.packet_type != GARBAGE_PACKET{
                 res_packets.push(data_packet);
             }

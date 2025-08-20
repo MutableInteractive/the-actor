@@ -94,7 +94,7 @@ pub struct RegisterHandlerRequest{
     pub s_type: ActorStructureType,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct RegisterHandlerAnswer{
     pub s_type: ActorStructureType,
     pub ipv4: String,

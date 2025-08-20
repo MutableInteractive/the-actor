@@ -3,17 +3,19 @@ use crate::handlers::actor_structure_type::{
 };
 use crate::vpn_config::VpnConfig;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::AtomicBool;
 use tfserver::client::Receiver;
 use tfserver::structures::s_type;
 use tfserver::structures::s_type::StructureType;
 
-pub trait OnRegisterInfoReceiver{
-    fn info_received(&mut self, reg_info: RegisterHandlerAnswer);
+pub trait OnRegisterInfoReceiver: Send + Sync {
+    fn info_received(&mut self, iv: String, reg_info: RegisterHandlerAnswer);
 }
 
 pub struct RegisterReceiver {
     pub iv_current: Option<String>,
     pub(crate) reg_info: Option<RegisterHandlerAnswer>,
+    pub(crate) data_send: AtomicBool,
     pub(crate) config: Arc<VpnConfig>,
     pub on_register_info: Arc<Mutex<dyn OnRegisterInfoReceiver>>,
 }
@@ -25,11 +27,13 @@ impl Receiver for RegisterReceiver {
 
 
     fn get_request(&mut self) -> Option<(Vec<u8>, Box<dyn StructureType>)> {
-        if self.iv_current.is_some() && self.reg_info.is_none() {
+        if self.iv_current.is_some() && !self.data_send.load(std::sync::atomic::Ordering::SeqCst) {
             println!("Awaiting reg info");
+            self.data_send.store(true, std::sync::atomic::Ordering::SeqCst);
             let request = RegisterHandlerRequest {
                 s_type: ActorStructureType::RegisterHandlerRequest,
             };
+            println!("Sending register info request");
             let register_req = s_type::to_vec(&request).unwrap();
             return Some((
                 register_req,
@@ -48,6 +52,7 @@ impl Receiver for RegisterReceiver {
             self.config.key.clone(),
             self.iv_current.as_ref().unwrap().as_bytes(),
         ).unwrap();
-        self.on_register_info.lock().unwrap().info_received(response);
+        self.reg_info = Some(response.clone());
+        self.on_register_info.lock().unwrap().info_received(self.iv_current.as_ref().unwrap().clone(), response);
     }
 }

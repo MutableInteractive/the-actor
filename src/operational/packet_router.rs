@@ -29,7 +29,7 @@ pub struct PacketRouterCreateInfo {
 pub struct AddressTuple {
     pub ip: Ipv4Addr,
     pub ip6: Ipv6Addr,
-    pub network_id: u8,
+    pub network_id: u32,
 }
 
 impl AddressTuple {
@@ -37,7 +37,7 @@ impl AddressTuple {
         Self {
             ip,
             ip6: Ipv6Addr::from([0; 16]),
-            network_id: ip.octets()[3],
+            network_id: ip.octets()[3] as u32,
         }
     }
     pub fn new6(ip: Ipv6Addr) -> Self {
@@ -46,7 +46,7 @@ impl AddressTuple {
         Self {
             ip: Ipv4Addr::from([0; 4]),
             ip6: ip,
-            network_id: id as u8,
+            network_id: id as u32,
         }
     }
     pub fn new_addr(ip: &IpAddr) -> Self {
@@ -62,7 +62,7 @@ impl AddressTuple {
         Self {
             ip,
             ip6,
-            network_id
+            network_id: network_id as u32,
         }
     }
 }
@@ -91,7 +91,10 @@ pub struct PacketRouter {
     registered_addresses: HashMap<AddressTuple, Arc<Mutex<dyn PacketReceiver>>>,
     router_subnet: Ipv4Addr,
     router_subnet_ipv6: Ipv6Addr,
-    subnet_counter: u8,
+    /** @TODO
+    In one time i will extend the clients pull amount, and enable packets exchange between clients
+    But not today...*/
+    subnet_counter: u32,
     free_addresses: Vec<AddressTuple>,
     interface: Arc<Mutex<TunInterface>>,
     resyncer_timeout: Duration,
@@ -123,7 +126,7 @@ impl PacketRouter {
                 self.router_subnet.octets()[0],
                 self.router_subnet.octets()[1],
                 self.router_subnet.octets()[2],
-                self.subnet_counter,
+                self.subnet_counter as u8,
             );
             let base_segments = self.router_subnet_ipv6.segments();
             let network_prefix = ((base_segments[0] as u128) << 112)
@@ -136,7 +139,7 @@ impl PacketRouter {
             AddressTuple {
                 ip: addr,
                 ip6: addr6,
-                network_id: self.subnet_counter,
+                network_id: self.subnet_counter as u32,
             }
         } else {
             self.free_addresses.pop().unwrap()
